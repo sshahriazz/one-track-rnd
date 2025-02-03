@@ -1,8 +1,8 @@
-use screenshots::Screen;
-use image::{ImageBuffer, Rgba};
-use serde::{Deserialize, Serialize};
-use base64::{Engine as _, engine::general_purpose::STANDARD as BASE64};
 use crate::global_screenshot_config;
+use base64::{engine::general_purpose::STANDARD as BASE64, Engine as _};
+use image::{ImageBuffer, Rgba};
+use screenshots::Screen;
+use serde::{Deserialize, Serialize};
 
 /// Represents different screenshot capture modes
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -12,7 +12,7 @@ pub enum CaptureMode {
     /// Capture all available screens
     All,
     /// Capture multiple selected screens by their indices
-    Multiple(Vec<usize>)
+    Multiple(Vec<usize>),
 }
 
 /// Configuration for screenshot capture
@@ -124,15 +124,17 @@ pub struct CapturedScreenshot {
 /// This version can be called from anywhere without Tauri dependencies
 pub fn get_screens() -> Result<Vec<ScreenInfo>> {
     println!("Attempting to get all screens...");
-    let screens = Screen::all()
-        .map_err(|e| ScreenshotError::new(
+    let screens = Screen::all().map_err(|e| {
+        ScreenshotError::new(
             ErrorCode::NoScreens,
-            format!("Failed to get screens: {}", e)
-        ))?;
+            format!("Failed to get screens: {}", e),
+        )
+    })?;
     println!("Found {} screens", screens.len());
     println!("Screen information: {:?}", screens);
     for (i, screen) in screens.iter().enumerate() {
-        println!("Screen {}: {}x{} @ ({},{}) [Primary: {}]", 
+        println!(
+            "Screen {}: {}x{} @ ({},{}) [Primary: {}]",
             i,
             screen.display_info.width,
             screen.display_info.height,
@@ -141,7 +143,9 @@ pub fn get_screens() -> Result<Vec<ScreenInfo>> {
             screen.display_info.is_primary
         );
     }
-    Ok(screens.iter().enumerate()
+    Ok(screens
+        .iter()
+        .enumerate()
         .map(|(index, screen)| ScreenInfo {
             index,
             name: if screen.display_info.is_primary {
@@ -169,11 +173,12 @@ pub async fn get_available_screens() -> Result<Vec<ScreenInfo>> {
 /// Update the screenshot configuration
 /// This version can be called from anywhere without Tauri dependencies
 pub fn update_config(new_config: ScreenshotConfig) -> Result<()> {
-    let mut config = global_screenshot_config().lock()
-        .map_err(|e| ScreenshotError::new(
+    let mut config = global_screenshot_config().lock().map_err(|e| {
+        ScreenshotError::new(
             ErrorCode::StateLockError,
-            format!("Failed to acquire config lock: {}", e)
-        ))?;
+            format!("Failed to acquire config lock: {}", e),
+        )
+    })?;
     *config = new_config;
     Ok(())
 }
@@ -187,11 +192,12 @@ pub async fn update_screenshot_config(config: ScreenshotConfig) -> Result<()> {
 /// Get the current screenshot configuration
 /// This version can be called from anywhere without Tauri dependencies
 pub fn get_config() -> Result<ScreenshotConfig> {
-    let config = global_screenshot_config().lock()
-        .map_err(|e| ScreenshotError::new(
+    let config = global_screenshot_config().lock().map_err(|e| {
+        ScreenshotError::new(
             ErrorCode::StateLockError,
-            format!("Failed to acquire config lock: {}", e)
-        ))?;
+            format!("Failed to acquire config lock: {}", e),
+        )
+    })?;
     Ok(config.clone())
 }
 
@@ -204,11 +210,12 @@ pub async fn get_screenshot_config() -> Result<ScreenshotConfig> {
 /// Set the capture mode
 /// This version can be called from anywhere without Tauri dependencies
 pub fn set_mode(mode: CaptureMode) -> Result<()> {
-    let mut config = global_screenshot_config().lock()
-        .map_err(|e| ScreenshotError::new(
+    let mut config = global_screenshot_config().lock().map_err(|e| {
+        ScreenshotError::new(
             ErrorCode::StateLockError,
-            format!("Failed to acquire config lock: {}", e)
-        ))?;
+            format!("Failed to acquire config lock: {}", e),
+        )
+    })?;
     config.mode = mode;
     Ok(())
 }
@@ -222,11 +229,12 @@ pub async fn set_capture_mode(mode: CaptureMode) -> Result<()> {
 /// Set the JPEG quality
 /// This version can be called from anywhere without Tauri dependencies
 pub fn set_jpeg_quality(quality: u8) -> Result<()> {
-    let mut config = global_screenshot_config().lock()
-        .map_err(|e| ScreenshotError::new(
+    let mut config = global_screenshot_config().lock().map_err(|e| {
+        ScreenshotError::new(
             ErrorCode::StateLockError,
-            format!("Failed to acquire config lock: {}", e)
-        ))?;
+            format!("Failed to acquire config lock: {}", e),
+        )
+    })?;
     config.quality = quality.clamp(1, 100);
     Ok(())
 }
@@ -240,11 +248,12 @@ pub async fn set_quality(quality: u8) -> Result<()> {
 /// Set the file prefix
 /// This version can be called from anywhere without Tauri dependencies
 pub fn set_prefix(prefix: String) -> Result<()> {
-    let mut config = global_screenshot_config().lock()
-        .map_err(|e| ScreenshotError::new(
+    let mut config = global_screenshot_config().lock().map_err(|e| {
+        ScreenshotError::new(
             ErrorCode::StateLockError,
-            format!("Failed to acquire config lock: {}", e)
-        ))?;
+            format!("Failed to acquire config lock: {}", e),
+        )
+    })?;
     config.file_prefix = prefix;
     Ok(())
 }
@@ -258,26 +267,31 @@ pub async fn set_file_prefix(prefix: String) -> Result<()> {
 /// Takes screenshots based on the provided configuration
 /// This version can be called from anywhere without Tauri dependencies
 pub fn capture_screenshots() -> Result<Vec<CapturedScreenshot>> {
-    let config = global_screenshot_config().lock()
-        .map_err(|e| ScreenshotError::new(
-            ErrorCode::StateLockError,
-            format!("Failed to acquire config lock: {}", e)
-        ))?.clone();
+    let config = global_screenshot_config()
+        .lock()
+        .map_err(|e| {
+            ScreenshotError::new(
+                ErrorCode::StateLockError,
+                format!("Failed to acquire config lock: {}", e),
+            )
+        })?
+        .clone();
 
     println!("Starting screenshot capture process...");
 
     println!("Getting screen information...");
-    let screens = Screen::all()
-        .map_err(|e| ScreenshotError::new(
+    let screens = Screen::all().map_err(|e| {
+        ScreenshotError::new(
             ErrorCode::CaptureFailed,
-            format!("Failed to get screens: {}", e)
-        ))?;
-    
+            format!("Failed to get screens: {}", e),
+        )
+    })?;
+
     println!("Found {} screens", screens.len());
     if screens.is_empty() {
         return Err(ScreenshotError::new(
             ErrorCode::NoScreens,
-            "No screens available for capture"
+            "No screens available for capture",
         ));
     }
 
@@ -287,22 +301,30 @@ pub fn capture_screenshots() -> Result<Vec<CapturedScreenshot>> {
             if index >= screens.len() {
                 return Err(ScreenshotError::new(
                     ErrorCode::InvalidScreenIndex,
-                    format!("Screen index {} is out of bounds (max: {})", index, screens.len() - 1)
+                    format!(
+                        "Screen index {} is out of bounds (max: {})",
+                        index,
+                        screens.len() - 1
+                    ),
                 ));
             }
             vec![index]
-        },
+        }
         CaptureMode::All => {
             println!("Capturing all {} screens", screens.len());
             (0..screens.len()).collect()
-        },
+        }
         CaptureMode::Multiple(ref indices) => {
             println!("Capturing multiple screens: {:?}", indices);
             for &index in indices {
                 if index >= screens.len() {
                     return Err(ScreenshotError::new(
                         ErrorCode::InvalidScreenIndex,
-                        format!("Screen index {} is out of bounds (max: {})", index, screens.len() - 1)
+                        format!(
+                            "Screen index {} is out of bounds (max: {})",
+                            index,
+                            screens.len() - 1
+                        ),
                     ));
                 }
             }
@@ -315,48 +337,54 @@ pub fn capture_screenshots() -> Result<Vec<CapturedScreenshot>> {
     for &index in &screen_indices {
         println!("Capturing screen {}...", index);
         let screen = &screens[index];
-        println!("Screen info: {}x{} @ ({},{})",
+        println!(
+            "Screen info: {}x{} @ ({},{})",
             screen.display_info.width,
             screen.display_info.height,
             screen.display_info.x,
             screen.display_info.y
         );
-        
+
         let buffer = match screen.capture() {
             Ok(buf) => {
                 println!("Successfully captured screen {}", index);
                 buf
-            },
+            }
             Err(e) => {
                 println!("Failed to capture screen {}: {}", index, e);
                 return Err(ScreenshotError::new(
                     ErrorCode::CaptureFailed,
-                    format!("Failed to capture screen {}: {}", index, e)
+                    format!("Failed to capture screen {}: {}", index, e),
                 ));
             }
         };
-        
+
         let img: ImageBuffer<Rgba<u8>, Vec<u8>> = ImageBuffer::from_raw(
             buffer.width() as u32,
             buffer.height() as u32,
-            buffer.into_raw()
-        ).ok_or_else(|| ScreenshotError::new(
-            ErrorCode::CaptureFailed,
-            format!("Failed to create image buffer for screen {}", index)
-        ))?;
+            buffer.into_raw(),
+        )
+        .ok_or_else(|| {
+            ScreenshotError::new(
+                ErrorCode::CaptureFailed,
+                format!("Failed to create image buffer for screen {}", index),
+            )
+        })?;
 
         // Create an in-memory buffer for the JPEG image
         let mut jpeg_data = Vec::new();
         let mut cursor = std::io::Cursor::new(&mut jpeg_data);
         img.write_to(&mut cursor, image::ImageFormat::Jpeg)
-            .map_err(|e| ScreenshotError::new(
-                ErrorCode::SaveFailed,
-                format!("Failed to encode JPEG for screen {}: {}", index, e)
-            ))?;
+            .map_err(|e| {
+                ScreenshotError::new(
+                    ErrorCode::SaveFailed,
+                    format!("Failed to encode JPEG for screen {}: {}", index, e),
+                )
+            })?;
 
         // Convert the JPEG data to base64
         let base64_data = BASE64.encode(&jpeg_data);
-        
+
         captured_screenshots.push(CapturedScreenshot {
             screen_index: index,
             width: img.width(),
@@ -378,7 +406,7 @@ pub fn capture_screenshots() -> Result<Vec<CapturedScreenshot>> {
     if captured_screenshots.is_empty() {
         Err(ScreenshotError::new(
             ErrorCode::CaptureFailed,
-            "No screenshots were captured"
+            "No screenshots were captured",
         ))
     } else {
         Ok(captured_screenshots)

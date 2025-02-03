@@ -1,8 +1,7 @@
+use chrono::{DateTime, Utc};
+use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
 use std::sync::Mutex;
-use once_cell::sync::Lazy;
-use std::time::{SystemTime, Duration};
-use chrono::{DateTime, Utc};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Project {
@@ -84,7 +83,7 @@ type Result<T> = std::result::Result<T, TrackerError>;
 
 pub fn start_tracking(project_id: String, task_id: String) -> Result<TimeEntry> {
     let mut state = TRACKER_STATE.lock().map_err(|e| TrackerError {
-        message: format!("Failed to acquire state lock: {}", e)
+        message: format!("Failed to acquire state lock: {}", e),
     })?;
 
     if state.is_tracking {
@@ -110,7 +109,7 @@ pub fn start_tracking(project_id: String, task_id: String) -> Result<TimeEntry> 
 
 pub fn stop_tracking() -> Result<TimeEntry> {
     let mut state = TRACKER_STATE.lock().map_err(|e| TrackerError {
-        message: format!("Failed to acquire state lock: {}", e)
+        message: format!("Failed to acquire state lock: {}", e),
     })?;
 
     if !state.is_tracking {
@@ -132,7 +131,7 @@ pub fn stop_tracking() -> Result<TimeEntry> {
 
 pub fn get_current_entry() -> Result<Option<TimeEntry>> {
     let state = TRACKER_STATE.lock().map_err(|e| TrackerError {
-        message: format!("Failed to acquire state lock: {}", e)
+        message: format!("Failed to acquire state lock: {}", e),
     })?;
 
     Ok(state.current_entry.clone())
@@ -140,7 +139,7 @@ pub fn get_current_entry() -> Result<Option<TimeEntry>> {
 
 pub fn get_projects() -> Result<Vec<Project>> {
     let state = TRACKER_STATE.lock().map_err(|e| TrackerError {
-        message: format!("Failed to acquire state lock: {}", e)
+        message: format!("Failed to acquire state lock: {}", e),
     })?;
 
     Ok(state.projects.clone())

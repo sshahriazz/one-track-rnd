@@ -1,23 +1,16 @@
 // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
 
-mod screenshot;
 mod keyboard_mouse_activity;
+mod screenshot;
 mod time_tracker;
-use screenshot::{
-    get_available_screens, get_screenshot_config, set_capture_mode, set_file_prefix, set_quality, take_screenshots, update_screenshot_config, ScreenshotConfig
-};
-use keyboard_mouse_activity::{
-    get_activity_config, update_activity_config, get_activity_status,
-    start_activity_tracking, stop_activity_tracking
-};
-use time_tracker::{
-    get_all_projects, start_time_tracking, stop_time_tracking, get_active_entry
-};
-use std::sync::Mutex;
+use screenshot::ScreenshotConfig;
+
 use once_cell::sync::Lazy;
+use std::sync::Mutex;
 
 // Global screenshot configuration
-pub static SCREENSHOT_CONFIG: Lazy<Mutex<ScreenshotConfig>> = Lazy::new(|| Mutex::new(ScreenshotConfig::default()));
+pub static SCREENSHOT_CONFIG: Lazy<Mutex<ScreenshotConfig>> =
+    Lazy::new(|| Mutex::new(ScreenshotConfig::default()));
 
 // Function to get access to the global config
 pub fn global_screenshot_config() -> &'static Mutex<ScreenshotConfig> {

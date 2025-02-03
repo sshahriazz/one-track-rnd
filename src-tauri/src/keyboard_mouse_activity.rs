@@ -1,7 +1,9 @@
-use device_query::{DeviceQuery, DeviceState, MouseState, Keycode};
-use serde::{Deserialize, Serialize};
-use std::sync::Mutex;
+use device_query::{DeviceQuery, DeviceState, MouseState};
 use once_cell::sync::Lazy;
+use serde::{Deserialize, Serialize};
+use std::collections::HashSet;
+use std::sync::Mutex;
+use std::{thread, time::Duration};
 
 /// Configuration for activity tracking
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -36,7 +38,7 @@ pub struct ActivityStatus {
 static DEVICE_STATE: Lazy<DeviceState> = Lazy::new(|| DeviceState::new());
 static LAST_MOUSE_POS: Lazy<Mutex<(i32, i32)>> = Lazy::new(|| Mutex::new((0, 0)));
 static CONFIG: Lazy<Mutex<ActivityConfig>> = Lazy::new(|| Mutex::new(ActivityConfig::default()));
-static LAST_KEYS: Lazy<Mutex<Vec<Keycode>>> = Lazy::new(|| Mutex::new(Vec::new()));
+static PREV_KEYS: Lazy<Mutex<HashSet<device_query::Keycode>>> = Lazy::new(|| Mutex::new(HashSet::new()));
 
 /// Custom error type for activity tracking
 #[derive(Debug, Serialize, Deserialize)]
@@ -56,22 +58,22 @@ type Result<T> = std::result::Result<T, ActivityError>;
 
 /// Track keyboard activity
 pub fn track_keyboard() -> bool {
-    let current_keys = DEVICE_STATE.get_keys();
-    let mut last_keys = LAST_KEYS.lock().unwrap();
+    // Add a small sleep to avoid excessive polling
+    thread::sleep(Duration::from_millis(10));
     
-    // Check if there are any new keys pressed
-    let has_new_keys = current_keys.iter().any(|k| !last_keys.contains(k));
+    let current_keys: HashSet<_> = DEVICE_STATE.get_keys().into_iter().collect();
+    let mut prev_keys = PREV_KEYS.lock().unwrap();
     
-    // Update last keys state
-    *last_keys = current_keys;
+    let has_activity = current_keys != *prev_keys;
+    *prev_keys = current_keys;
     
-    has_new_keys
+    has_activity
 }
 
 /// Track mouse activity
 pub fn track_mouse() -> bool {
     let mouse: MouseState = DEVICE_STATE.get_mouse();
-    let current_pos = (mouse.coords.0, mouse.coords.1);
+    let current_pos = mouse.coords;
     let mut last_pos = LAST_MOUSE_POS.lock().unwrap();
     
     let moved = current_pos != *last_pos;
@@ -88,7 +90,7 @@ pub fn track_mouse() -> bool {
 /// Start activity tracking
 pub fn start_tracking() -> Result<()> {
     let mut config = CONFIG.lock().map_err(|e| ActivityError {
-        message: format!("Failed to acquire config lock: {}", e)
+        message: format!("Failed to acquire config lock: {}", e),
     })?;
     config.is_tracking = true;
     Ok(())
@@ -97,7 +99,7 @@ pub fn start_tracking() -> Result<()> {
 /// Stop activity tracking
 pub fn stop_tracking() -> Result<()> {
     let mut config = CONFIG.lock().map_err(|e| ActivityError {
-        message: format!("Failed to acquire config lock: {}", e)
+        message: format!("Failed to acquire config lock: {}", e),
     })?;
     config.is_tracking = false;
     Ok(())
@@ -106,19 +108,27 @@ pub fn stop_tracking() -> Result<()> {
 /// Combined tracking based on configuration
 pub fn track_activity() -> Result<ActivityStatus> {
     let config = CONFIG.lock().map_err(|e| ActivityError {
-        message: format!("Failed to acquire config lock: {}", e)
+        message: format!("Failed to acquire config lock: {}", e),
     })?;
-    
+
     if !config.is_tracking {
         return Ok(ActivityStatus {
             keyboard_active: false,
             mouse_active: false,
         });
     }
-    
-    let keyboard_active = if config.track_keyboard { track_keyboard() } else { false };
-    let mouse_active = if config.track_mouse { track_mouse() } else { false };
-    
+
+    let keyboard_active = if config.track_keyboard {
+        track_keyboard()
+    } else {
+        false
+    };
+    let mouse_active = if config.track_mouse {
+        track_mouse()
+    } else {
+        false
+    };
+
     Ok(ActivityStatus {
         keyboard_active,
         mouse_active,
@@ -128,7 +138,7 @@ pub fn track_activity() -> Result<ActivityStatus> {
 /// Update the activity tracking configuration
 pub fn update_config(new_config: ActivityConfig) -> Result<()> {
     let mut config = CONFIG.lock().map_err(|e| ActivityError {
-        message: format!("Failed to acquire config lock: {}", e)
+        message: format!("Failed to acquire config lock: {}", e),
     })?;
     *config = new_config;
     Ok(())
@@ -137,7 +147,7 @@ pub fn update_config(new_config: ActivityConfig) -> Result<()> {
 /// Get the current activity tracking configuration
 pub fn get_config() -> Result<ActivityConfig> {
     let config = CONFIG.lock().map_err(|e| ActivityError {
-        message: format!("Failed to acquire config lock: {}", e)
+        message: format!("Failed to acquire config lock: {}", e),
     })?;
     Ok(config.clone())
 }
