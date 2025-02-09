@@ -29,6 +29,22 @@ interface Task {
   project_id: string;
 }
 
+interface ActivityConfig {
+  track_keyboard: boolean;
+  track_mouse: boolean;
+  is_tracking: boolean;
+  idle_detection_enabled: boolean;
+  idle_threshold_minutes: number;
+  require_idle_reason: boolean;
+}
+
+interface IdleTimeEntry {
+  start_time: string;
+  end_time: string;
+  duration: number;
+  reason?: string;
+}
+
 interface TimeEntry {
   id: string;
   project_id: string;
@@ -36,6 +52,7 @@ interface TimeEntry {
   start_time: string;
   end_time?: string;
   duration?: number;
+  idle_time?: IdleTimeEntry;
 }
 
 function App() {
@@ -44,19 +61,73 @@ function App() {
   const [quality, setQuality] = useState(85);
   const [filePrefix, setFilePrefix] = useState("screenshot");
   const [status, setStatus] = useState("");
-  const [capturedScreenshots, setCapturedScreenshots] = useState<CapturedScreenshot[]>([]);
+  const [capturedScreenshots, setCapturedScreenshots] = useState<
+    CapturedScreenshot[]
+  >([]);
   const [projects, setProjects] = useState<Project[]>([]);
-  const [selectedProject, setSelectedProject] = useState<string>('');
-  const [selectedTask, setSelectedTask] = useState<string>('');
+  const [selectedProject, setSelectedProject] = useState<string>("");
+  const [selectedTask, setSelectedTask] = useState<string>("");
   const [isTracking, setIsTracking] = useState(false);
   const [activeEntry, setActiveEntry] = useState<TimeEntry | null>(null);
-  const [elapsedTime, setElapsedTime] = useState<string>('00:00:00');
+  const [elapsedTime, setElapsedTime] = useState<string>("00:00:00");
+  const [showIdleDialog, setShowIdleDialog] = useState(false);
+  const [idleReason, setIdleReason] = useState("");
+  const [isIdle, setIsIdle] = useState(false);
+  const [activityConfig, setActivityConfig] = useState<ActivityConfig>({
+    track_keyboard: true,
+    track_mouse: true,
+    is_tracking: false,
+    idle_detection_enabled: true,
+    idle_threshold_minutes: 5,
+    require_idle_reason: true,
+  });
 
   useEffect(() => {
     loadScreens();
     loadProjects();
     checkActiveEntry();
-  }, []);
+    loadActivityConfig();
+
+    // Set up idle detection check
+    console.log("Setting up idle detection with config:", activityConfig);
+
+    const idleCheckInterval = setInterval(async () => {
+      console.log(
+        "Checking idle status. isTracking:",
+        isTracking,
+        "idle detection enabled:",
+        activityConfig.idle_detection_enabled
+      );
+
+      if (isTracking && activityConfig.idle_detection_enabled) {
+        try {
+          await invoke("check_idle_status");
+          const userIsIdle = await invoke<boolean>("is_user_idle");
+          console.log(
+            "User idle status:",
+            userIsIdle,
+            "previous idle state:",
+            isIdle
+          );
+
+          if (userIsIdle && !isIdle) {
+            console.log("User became idle");
+            setIsIdle(true);
+          } else if (!userIsIdle && isIdle) {
+            console.log("User became active, showing idle dialog");
+            setIsIdle(false);
+            setShowIdleDialog(true);
+          }
+        } catch (error) {
+          console.error("Error checking idle status:", error);
+        }
+      }
+    }, 10000); // Check every 10 seconds for testing
+
+    return () => {
+      clearInterval(idleCheckInterval);
+    };
+  }, [isTracking, isIdle]);
 
   useEffect(() => {
     let interval: number | undefined;
@@ -65,13 +136,15 @@ function App() {
         const startTime = new Date(activeEntry.start_time).getTime();
         const now = new Date().getTime();
         const diff = Math.floor((now - startTime) / 1000);
-        
+
         const hours = Math.floor(diff / 3600);
         const minutes = Math.floor((diff % 3600) / 60);
         const seconds = diff % 60;
-        
+
         setElapsedTime(
-          `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`
+          `${hours.toString().padStart(2, "0")}:${minutes
+            .toString()
+            .padStart(2, "0")}:${seconds.toString().padStart(2, "0")}`
         );
       }, 1000);
     }
@@ -82,16 +155,37 @@ function App() {
 
   async function loadScreens() {
     try {
-      const availableScreens = await invoke<ScreenInfo[]>("get_available_screens");
+      const availableScreens = await invoke<ScreenInfo[]>(
+        "get_available_screens"
+      );
       setScreens(availableScreens);
     } catch (error) {
       setStatus("Failed to load screens: " + error);
     }
   }
 
+  async function loadActivityConfig() {
+    try {
+      const config = await invoke<ActivityConfig>("get_activity_config");
+      setActivityConfig(config);
+    } catch (error) {
+      console.error("Error loading activity config:", error);
+    }
+  }
+
+  const handleConfigChange = async (updates: Partial<ActivityConfig>) => {
+    try {
+      const newConfig = { ...activityConfig, ...updates };
+      await invoke("update_activity_config", { config: newConfig });
+      setActivityConfig(newConfig);
+    } catch (error) {
+      console.error("Error updating activity config:", error);
+    }
+  };
+
   async function loadProjects() {
     try {
-      const projectList = await invoke<Project[]>('get_all_projects');
+      const projectList = await invoke<Project[]>("get_all_projects");
       setProjects(projectList);
       if (projectList.length > 0) {
         setSelectedProject(projectList[0].id);
@@ -100,13 +194,13 @@ function App() {
         }
       }
     } catch (error) {
-      console.error('Error loading projects:', error);
+      console.error("Error loading projects:", error);
     }
   }
 
   async function checkActiveEntry() {
     try {
-      const entry = await invoke<TimeEntry | null>('get_active_entry');
+      const entry = await invoke<TimeEntry | null>("get_active_entry");
       if (entry) {
         setIsTracking(true);
         setActiveEntry(entry);
@@ -114,7 +208,7 @@ function App() {
         setSelectedTask(entry.task_id);
       }
     } catch (error) {
-      console.error('Error checking active entry:', error);
+      console.error("Error checking active entry:", error);
     }
   }
 
@@ -122,18 +216,21 @@ function App() {
     try {
       setStatus("Taking screenshot...");
       setCapturedScreenshots([]);
-      
+
       await invoke("update_screenshot_config", {
         config: {
-          mode: selectedScreens.length === 0 
-            ? { All: null }
-            : { Multiple: selectedScreens },
+          mode:
+            selectedScreens.length === 0
+              ? { All: null }
+              : { Multiple: selectedScreens },
           quality,
-          file_prefix: filePrefix
-        }
+          file_prefix: filePrefix,
+        },
       });
 
-      const screenshots = await invoke<CapturedScreenshot[]>("take_screenshots");
+      const screenshots = await invoke<CapturedScreenshot[]>(
+        "take_screenshots"
+      );
       setCapturedScreenshots(screenshots);
       setStatus(`Successfully captured ${screenshots.length} screenshot(s)`);
     } catch (error) {
@@ -142,56 +239,181 @@ function App() {
   }
 
   const toggleScreen = (index: number) => {
-    setSelectedScreens(prev => 
-      prev.includes(index)
-        ? prev.filter(i => i !== index)
-        : [...prev, index]
+    setSelectedScreens((prev) =>
+      prev.includes(index) ? prev.filter((i) => i !== index) : [...prev, index]
     );
   };
 
   const handleStartTracking = async () => {
     if (!selectedProject || !selectedTask) return;
-    
+
     try {
-      const entry = await invoke<TimeEntry>('start_time_tracking', {
+      console.log("Starting time tracking and activity monitoring");
+
+      // Start activity tracking first
+      await invoke("start_activity_tracking");
+
+      // Then start time tracking
+      const entry = await invoke<TimeEntry>("start_time_tracking", {
         projectId: selectedProject,
         taskId: selectedTask,
       });
+
+      console.log("Time tracking started with entry:", entry);
       setIsTracking(true);
       setActiveEntry(entry);
-      setElapsedTime('00:00:00');
+      setElapsedTime("00:00:00");
     } catch (error) {
-      console.error('Error starting time tracking:', error);
+      console.error("Error starting time tracking:", error);
     }
   };
 
   const handleStopTracking = async () => {
     try {
-      await invoke<TimeEntry>('stop_time_tracking');
+      console.log("Stopping time tracking and activity monitoring");
+
+      // Stop time tracking first
+      await invoke<TimeEntry>("stop_time_tracking");
+
+      // Then stop activity tracking
+      await invoke("stop_activity_tracking");
+
+      console.log("Time tracking stopped");
       setIsTracking(false);
       setActiveEntry(null);
-      setElapsedTime('00:00:00');
+      setElapsedTime("00:00:00");
     } catch (error) {
-      console.error('Error stopping time tracking:', error);
+      console.error("Error stopping time tracking:", error);
+    }
+  };
+
+  const handleIdleDecision = async (keepTime: boolean) => {
+    try {
+      await invoke("handle_idle_decision", {
+        keepTime,
+        reason:
+          keepTime && activityConfig.require_idle_reason
+            ? idleReason
+            : undefined,
+      });
+      setShowIdleDialog(false);
+      setIdleReason("");
+    } catch (error) {
+      console.error("Error handling idle decision:", error);
     }
   };
 
   return (
     <div className="app-container">
       <h1 className="app-title">Screen Capture</h1>
-      
+
       {/* Activity Tracker */}
       <ActivityTracker />
-      
+
+      {/* Activity Configuration */}
+      <div className="section">
+        <h2 className="section-title">Activity Settings</h2>
+        <div className="settings-grid">
+          <div className="input-group">
+            <label className="input-label">
+              <input
+                type="checkbox"
+                checked={activityConfig.idle_detection_enabled}
+                onChange={(e) =>
+                  handleConfigChange({
+                    idle_detection_enabled: e.target.checked,
+                  })
+                }
+              />
+              <span>Enable Idle Detection</span>
+            </label>
+          </div>
+
+          <div className="input-group">
+            <label className="input-label" htmlFor="idleThreshold">
+              Idle Threshold (minutes)
+            </label>
+            <input
+              id="idleThreshold"
+              type="number"
+              min="1"
+              max="60"
+              value={activityConfig.idle_threshold_minutes}
+              onChange={(e) =>
+                handleConfigChange({
+                  idle_threshold_minutes: Math.max(
+                    1,
+                    Math.min(60, parseInt(e.target.value) || 1)
+                  ),
+                })
+              }
+              className="input-field"
+              disabled={!activityConfig.idle_detection_enabled}
+            />
+          </div>
+
+          <div className="input-group">
+            <label className="input-label">
+              <input
+                type="checkbox"
+                checked={activityConfig.require_idle_reason}
+                onChange={(e) =>
+                  handleConfigChange({ require_idle_reason: e.target.checked })
+                }
+                disabled={!activityConfig.idle_detection_enabled}
+              />
+              <span>Require Reason for Idle Time</span>
+            </label>
+          </div>
+        </div>
+      </div>
+
+      {/* Idle Dialog */}
+      {showIdleDialog && (
+        <div className="idle-dialog">
+          <div className="idle-dialog-content">
+            <h2>Idle Time Detected</h2>
+            <p>
+              You were idle for some time. Would you like to keep this time?
+            </p>
+
+            <div className="idle-form">
+              {activityConfig.require_idle_reason && (
+                <textarea
+                  value={idleReason}
+                  onChange={(e) => setIdleReason(e.target.value)}
+                  placeholder="Enter reason for idle time"
+                  className="idle-reason-input"
+                  required
+                />
+              )}
+
+              <div className="idle-buttons">
+                <button
+                  onClick={() => handleIdleDecision(true)}
+                  disabled={activityConfig.require_idle_reason && !idleReason}
+                  className="keep-time-btn"
+                >
+                  Keep Time
+                </button>
+                <button
+                  onClick={() => handleIdleDecision(false)}
+                  className="discard-time-btn"
+                >
+                  Discard Time
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Screen Selection */}
       <div className="section">
         <h2 className="section-title">Available Screens</h2>
         <div className="screen-list">
-          {screens.map(screen => (
-            <label 
-              key={screen.index}
-              className="screen-item"
-            >
+          {screens.map((screen) => (
+            <label key={screen.index} className="screen-item">
               <input
                 type="checkbox"
                 checked={selectedScreens.includes(screen.index)}
@@ -204,8 +426,8 @@ function App() {
           ))}
         </div>
         <div className="selected-count">
-          {selectedScreens.length === 0 
-            ? "All screens will be captured" 
+          {selectedScreens.length === 0
+            ? "All screens will be captured"
             : `Selected: ${selectedScreens.length} screen(s)`}
         </div>
       </div>
@@ -252,13 +474,14 @@ function App() {
           <div className="screenshots-grid">
             {capturedScreenshots.map((screenshot, index) => (
               <div key={index} className="screenshot-item">
-                <img 
+                <img
                   src={`data:image/jpeg;base64,${screenshot.image_data}`}
                   alt={`Screen ${screenshot.screen_index}`}
                   className="screenshot-image"
                 />
                 <div className="screenshot-info">
-                  Screen {screenshot.screen_index} ({screenshot.width}x{screenshot.height})
+                  Screen {screenshot.screen_index} ({screenshot.width}x
+                  {screenshot.height})
                 </div>
               </div>
             ))}
@@ -272,7 +495,7 @@ function App() {
         <div className="card">
           <div className="form-group">
             <label>Project:</label>
-            <select 
+            <select
               value={selectedProject}
               onChange={(e) => setSelectedProject(e.target.value)}
               disabled={isTracking}
@@ -287,7 +510,7 @@ function App() {
 
           <div className="form-group">
             <label>Task:</label>
-            <select 
+            <select
               value={selectedTask}
               onChange={(e) => setSelectedTask(e.target.value)}
               disabled={isTracking}
@@ -310,13 +533,15 @@ function App() {
               <div className="entry-details">
                 <p>
                   <strong>Project: </strong>
-                  {projects.find(p => p.id === activeEntry.project_id)?.name}
+                  {projects.find((p) => p.id === activeEntry.project_id)?.name}
                 </p>
                 <p>
                   <strong>Task: </strong>
-                  {projects
-                    .find(p => p.id === activeEntry.project_id)
-                    ?.tasks.find(t => t.id === activeEntry.task_id)?.name}
+                  {
+                    projects
+                      .find((p) => p.id === activeEntry.project_id)
+                      ?.tasks.find((t) => t.id === activeEntry.task_id)?.name
+                  }
                 </p>
                 <p>
                   <strong>Started: </strong>
@@ -332,7 +557,7 @@ function App() {
 
           <div className="button-group">
             {!isTracking ? (
-              <button 
+              <button
                 className="start-button"
                 onClick={handleStartTracking}
                 disabled={!selectedProject || !selectedTask}
@@ -340,10 +565,7 @@ function App() {
                 Start Tracking
               </button>
             ) : (
-              <button 
-                className="stop-button"
-                onClick={handleStopTracking}
-              >
+              <button className="stop-button" onClick={handleStopTracking}>
                 Stop Tracking
               </button>
             )}

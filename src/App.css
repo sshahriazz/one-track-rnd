@@ -99,6 +99,131 @@ body {
   border: 1px solid #cbd5e1;
   border-radius: 6px;
   font-size: 0.95rem;
+}
+
+/* Idle Dialog Styles */
+.idle-dialog {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+}
+
+.idle-dialog-content {
+  background-color: #ffffff;
+  padding: 2rem;
+  border-radius: 8px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+  max-width: 500px;
+  width: 90%;
+}
+
+.idle-dialog h2 {
+  margin-top: 0;
+  color: #1e293b;
+  font-size: 1.5rem;
+  font-weight: 600;
+  margin-bottom: 1rem;
+}
+
+.idle-dialog p {
+  color: #334155;
+  margin-bottom: 1.5rem;
+}
+
+.idle-form {
+  margin-top: 1.5rem;
+}
+
+.idle-reason-input {
+  width: 100%;
+  min-height: 100px;
+  padding: 0.75rem;
+  margin-bottom: 1.5rem;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  resize: vertical;
+  font-size: 0.95rem;
+  color: #1e293b;
+  background-color: #f8fafc;
+}
+
+.idle-reason-input:focus {
+  outline: none;
+  border-color: #60a5fa;
+  box-shadow: 0 0 0 2px rgba(96, 165, 250, 0.2);
+}
+
+.idle-buttons {
+  display: flex;
+  gap: 1rem;
+  justify-content: flex-end;
+}
+
+.keep-time-btn,
+.discard-time-btn {
+  padding: 0.75rem 1.5rem;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: 500;
+  font-size: 0.95rem;
+  transition: all 0.2s;
+}
+
+.keep-time-btn {
+  background-color: #2563eb;
+  color: white;
+}
+
+.keep-time-btn:disabled {
+  background-color: #94a3b8;
+  cursor: not-allowed;
+}
+
+.keep-time-btn:hover:not(:disabled) {
+  background-color: #1d4ed8;
+}
+
+.discard-time-btn {
+  background-color: #ef4444;
+  color: white;
+}
+
+.discard-time-btn:hover {
+  background-color: #dc2626;
+}
+
+/* Dark mode styles */
+@media (prefers-color-scheme: dark) {
+  .idle-dialog-content {
+    background-color: #1e293b;
+  }
+
+  .idle-dialog h2 {
+    color: #f8fafc;
+  }
+
+  .idle-dialog p {
+    color: #e2e8f0;
+  }
+
+  .idle-reason-input {
+    background-color: #0f172a;
+    border-color: #334155;
+    color: #f8fafc;
+  }
+
+  .idle-reason-input:focus {
+    border-color: #3b82f6;
+  }
+}
   color: #1e293b;
   background: #ffffff;
   transition: border-color 0.2s;

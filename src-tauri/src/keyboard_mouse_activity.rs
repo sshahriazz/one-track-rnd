@@ -14,6 +14,12 @@ pub struct ActivityConfig {
     pub track_mouse: bool,
     /// Whether tracking is currently active
     pub is_tracking: bool,
+    /// Enable/disable idle detection
+    pub idle_detection_enabled: bool,
+    /// Idle threshold in minutes
+    pub idle_threshold_minutes: u32,
+    /// Whether to require reason for idle time
+    pub require_idle_reason: bool,
 }
 
 impl Default for ActivityConfig {
@@ -22,6 +28,9 @@ impl Default for ActivityConfig {
             track_keyboard: true,
             track_mouse: true,
             is_tracking: false,
+            idle_detection_enabled: true,
+            idle_threshold_minutes: 5,
+            require_idle_reason: true,
         }
     }
 }
@@ -38,7 +47,8 @@ pub struct ActivityStatus {
 static DEVICE_STATE: Lazy<DeviceState> = Lazy::new(|| DeviceState::new());
 static LAST_MOUSE_POS: Lazy<Mutex<(i32, i32)>> = Lazy::new(|| Mutex::new((0, 0)));
 static CONFIG: Lazy<Mutex<ActivityConfig>> = Lazy::new(|| Mutex::new(ActivityConfig::default()));
-static PREV_KEYS: Lazy<Mutex<HashSet<device_query::Keycode>>> = Lazy::new(|| Mutex::new(HashSet::new()));
+static PREV_KEYS: Lazy<Mutex<HashSet<device_query::Keycode>>> =
+    Lazy::new(|| Mutex::new(HashSet::new()));
 
 /// Custom error type for activity tracking
 #[derive(Debug, Serialize, Deserialize)]
@@ -60,13 +70,13 @@ type Result<T> = std::result::Result<T, ActivityError>;
 pub fn track_keyboard() -> bool {
     // Add a small sleep to avoid excessive polling
     thread::sleep(Duration::from_millis(10));
-    
+
     let current_keys: HashSet<_> = DEVICE_STATE.get_keys().into_iter().collect();
     let mut prev_keys = PREV_KEYS.lock().unwrap();
-    
+
     let has_activity = current_keys != *prev_keys;
     *prev_keys = current_keys;
-    
+
     has_activity
 }
 
@@ -75,15 +85,15 @@ pub fn track_mouse() -> bool {
     let mouse: MouseState = DEVICE_STATE.get_mouse();
     let current_pos = mouse.coords;
     let mut last_pos = LAST_MOUSE_POS.lock().unwrap();
-    
+
     let moved = current_pos != *last_pos;
     let clicked = mouse.button_pressed.iter().any(|&b| b);
-    
+
     // Only update last position if the mouse actually moved
     if moved {
         *last_pos = current_pos;
     }
-    
+
     moved || clicked
 }
 
@@ -107,11 +117,16 @@ pub fn stop_tracking() -> Result<()> {
 
 /// Combined tracking based on configuration
 pub fn track_activity() -> Result<ActivityStatus> {
+    println!("[Backend] Checking activity status");
+
     let config = CONFIG.lock().map_err(|e| ActivityError {
         message: format!("Failed to acquire config lock: {}", e),
     })?;
 
+    println!("[Backend] Activity config: {:?}", config);
+
     if !config.is_tracking {
+        println!("[Backend] Activity tracking is disabled");
         return Ok(ActivityStatus {
             keyboard_active: false,
             mouse_active: false,
@@ -119,13 +134,19 @@ pub fn track_activity() -> Result<ActivityStatus> {
     }
 
     let keyboard_active = if config.track_keyboard {
-        track_keyboard()
+        let active = track_keyboard();
+        println!("[Backend] Keyboard activity detected: {}", active);
+        active
     } else {
+        println!("[Backend] Keyboard tracking disabled");
         false
     };
     let mouse_active = if config.track_mouse {
-        track_mouse()
+        let active = track_mouse();
+        println!("[Backend] Mouse activity detected: {}", active);
+        active
     } else {
+        println!("[Backend] Mouse tracking disabled");
         false
     };
 

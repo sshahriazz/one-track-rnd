@@ -38,6 +38,9 @@ pub fn run() {
             time_tracker::start_time_tracking,
             time_tracker::stop_time_tracking,
             time_tracker::get_active_entry,
+            time_tracker::check_idle_status,
+            time_tracker::handle_idle_decision,
+            time_tracker::is_user_idle
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
