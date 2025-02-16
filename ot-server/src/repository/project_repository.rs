@@ -8,7 +8,6 @@ use crate::{
     utils::error::AppError,
 };
 
-#[derive(Debug)]
 pub struct ProjectQuery;
 
 pub struct ProjectMutation;

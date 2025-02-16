@@ -33,7 +33,7 @@ impl SectionMutationHandlers {
                 }),
             )
                 .into_response(),
-            Err(e) => e.into_response(),
+            Err(e) => (StatusCode::BAD_REQUEST, e).into_response(),
         }
     }
 

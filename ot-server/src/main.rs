@@ -1,11 +1,20 @@
 #![deny(unsafe_code)]
+#![allow(unused_imports)]
 use axum::Router;
 use chrono::Local;
 use config::env::EnvironmentVariables;
-use routes::{project_route::project_routes, section_route::section_routes};
+use routes::{
+    project_route::project_routes, section_route::section_routes, sub_task_route::sub_task_routes,
+    task_route::task_routes,
+};
 
 use sea_orm::{DatabaseConnection, DbErr};
-use std::{error::Error, panic, sync::Arc, time::Duration};
+use std::{
+    error::Error,
+    panic,
+    sync::{Arc, RwLock},
+    time::Duration,
+};
 use tokio::time::sleep;
 use tower_http::trace::TraceLayer;
 use tracing::{error, info, warn};
@@ -29,6 +38,8 @@ pub struct AppState {
     pub client: reqwest::Client,
     pub is_standalone: bool,
 }
+
+type ApplicationState = Arc<RwLock<AppState>>;
 
 impl AppState {
     pub async fn from_env() -> anyhow::Result<Self> {
@@ -149,6 +160,8 @@ async fn main() -> Result<(), Box<dyn Error>> {
     let api_routes = Router::new()
         .nest("/project", project_routes())
         .nest("/section", section_routes())
+        .nest("/task", task_routes())
+        .nest("/sub-task", sub_task_routes())
         .layer(
             TraceLayer::new_for_http()
                 .make_span_with(
