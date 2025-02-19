@@ -115,4 +115,26 @@ impl TaskQueryHandlers {
             Err(e) => e.into_response(),
         }
     }
+
+    pub async fn get_tasks_by_section_id_handler(
+        state: State<AppState>,
+        Path(section_id): Path<Uuid>,
+    ) -> impl IntoResponse {
+        match TaskService::get_tasks_by_section_id(&state.db, section_id).await {
+            Ok(tasks) => {
+                let result_data = tasks
+                    .iter()
+                    .map(|t| TaskDto {
+                        id: t.id,
+                        name: t.name.clone(),
+                        section_id: t.section_id,
+                        created_at: t.created_at,
+                        updated_at: t.updated_at,
+                    })
+                    .collect::<Vec<TaskDto>>();
+                (StatusCode::OK, Json(result_data)).into_response()
+            }
+            Err(e) => (StatusCode::BAD_REQUEST, e).into_response(),
+        }
+    }
 }

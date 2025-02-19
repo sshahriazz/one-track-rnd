@@ -11,6 +11,10 @@ use crate::{
 pub fn section_routes() -> Router<AppState> {
     let section_router = Router::new()
         .route("/all", get(SQH::get_sections_handler))
+        .route(
+            "/by-project-id/{project_id}",
+            get(SQH::get_sections_by_project_id_handler),
+        )
         .route("/{id}", get(SQH::get_section_by_id_handler))
         .route("/create", post(SMH::create_section_handler))
         .route("/update/{id}", patch(SMH::update_section_handler))

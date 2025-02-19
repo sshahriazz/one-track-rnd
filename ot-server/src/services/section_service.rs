@@ -21,6 +21,13 @@ impl SectionService {
         SQ::get_section_by_id(db, id).await
     }
 
+    pub async fn get_sections_by_project_id(
+        db: &DatabaseConnection,
+        project_id: Uuid,
+    ) -> Result<Vec<section::Model>, AppError> {
+        SQ::get_sections_by_project_id(db, project_id).await
+    }
+
     pub async fn create_section(
         db: &DatabaseConnection,
         data: SectionCreateDto,

@@ -3,7 +3,7 @@ use sea_orm::prelude::Uuid;
 use serde::{Deserialize, Serialize};
 use validator::Validate;
 
-#[derive(Validate, Serialize)]
+#[derive(Validate, Serialize, Deserialize)]
 pub struct SectionDto {
     pub id: Uuid,
     pub name: String,

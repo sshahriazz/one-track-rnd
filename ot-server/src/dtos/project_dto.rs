@@ -33,8 +33,3 @@ pub struct ProjectDto {
     pub updated_at: DateTime<FixedOffset>,
     pub version: i32,
 }
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct ProjectListResponse {
-    pub projects: Vec<ProjectDto>,
-}

@@ -3,6 +3,10 @@ name = "ot-server"
 version = "0.1.0"
 edition = "2021"
 
+[lib]
+name = "ot_server"
+path = "src/lib.rs"
+
 [dependencies]
 axum = {version = "0.8", features = ["tracing"]}
 futures = "0.3.31"

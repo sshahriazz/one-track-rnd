@@ -4,8 +4,8 @@ use crate::{
     utils::error::AppError,
 };
 use sea_orm::{
-    prelude::Uuid, ActiveModelTrait, ActiveValue, DatabaseConnection, DbErr, DeleteResult,
-    EntityTrait,
+    prelude::Uuid, ActiveModelTrait, ActiveValue, ColumnTrait, DatabaseConnection, DbErr,
+    DeleteResult, EntityTrait, QueryFilter,
 };
 
 pub struct TaskMutation;
@@ -72,5 +72,15 @@ impl TaskQuery {
             .one(db)
             .await
             .map_err(|e| AppError::InternalServerError(format!("Failed to get task: {}", e)))
+    }
+    pub async fn get_tasks_by_section_id(
+        db: &DatabaseConnection,
+        section_id: Uuid,
+    ) -> Result<Vec<task::Model>, AppError> {
+        Task::find()
+            .filter(task::Column::SectionId.eq(section_id))
+            .all(db)
+            .await
+            .map_err(|e| AppError::InternalServerError(format!("Failed to get tasks: {}", e)))
     }
 }

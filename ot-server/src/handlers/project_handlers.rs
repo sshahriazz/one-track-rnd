@@ -7,7 +7,7 @@ use axum_valid::Valid;
 use sea_orm::prelude::Uuid;
 
 use crate::{
-    dtos::project_dto::{ProjectCreateDto, ProjectDto, ProjectListResponse, ProjectUpdateDto},
+    dtos::project_dto::{ProjectCreateDto, ProjectDto, ProjectUpdateDto},
     services::project_service::ProjectService,
     utils::error::AppError,
     AppState,
@@ -92,7 +92,7 @@ impl ProjectQueryHandlers {
                         updated_at: project.updated_at,
                     })
                     .collect::<Vec<_>>();
-                (StatusCode::OK, Json(ProjectListResponse { projects })).into_response()
+                (StatusCode::OK, Json(projects)).into_response()
             }
             Err(e) => e.into_response(),
         }

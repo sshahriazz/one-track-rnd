@@ -21,6 +21,13 @@ impl TaskService {
         TQ::get_task_by_id(db, id).await
     }
 
+    pub async fn get_tasks_by_section_id(
+        db: &DatabaseConnection,
+        section_id: Uuid,
+    ) -> Result<Vec<task::Model>, AppError> {
+        TQ::get_tasks_by_section_id(db, section_id).await
+    }
+
     pub async fn create_task(
         db: &DatabaseConnection,
         data: TaskCreateDto,

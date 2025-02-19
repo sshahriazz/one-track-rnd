@@ -180,7 +180,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
         .nest("/api", api_routes)
         .with_state(state.clone());
 
-    let listener = tokio::net::TcpListener::bind("0.0.0.0:3000").await?;
+    let listener = tokio::net::TcpListener::bind("0.0.0.0:4000").await?;
     info!("Server listening on port 3000");
 
     // Set up graceful shutdown

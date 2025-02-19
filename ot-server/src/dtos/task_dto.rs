@@ -3,7 +3,7 @@ use sea_orm::prelude::Uuid;
 use serde::{Deserialize, Serialize};
 use validator::Validate;
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct TaskDto {
     pub name: String,
     pub section_id: Uuid,

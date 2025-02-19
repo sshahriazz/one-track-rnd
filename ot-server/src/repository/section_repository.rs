@@ -72,4 +72,14 @@ impl SectionQuery {
             .await
             .map_err(|e| AppError::InternalServerError(format!("Failed to get section: {}", e)))
     }
+    pub async fn get_sections_by_project_id(
+        db: &DatabaseConnection,
+        project_id: Uuid,
+    ) -> Result<Vec<section::Model>, AppError> {
+        Section::find()
+            .filter(section::Column::ProjectId.eq(project_id))
+            .all(db)
+            .await
+            .map_err(|e| AppError::InternalServerError(format!("Failed to get sections: {}", e)))
+    }
 }

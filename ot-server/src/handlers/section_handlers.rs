@@ -95,6 +95,30 @@ impl SectionQueryHandlers {
         }
     }
 
+    pub async fn get_sections_by_project_id_handler(
+        state: State<AppState>,
+        Path(project_id): Path<Uuid>,
+    ) -> impl IntoResponse {
+        match SectionService::get_sections_by_project_id(&state.db, project_id).await {
+            Ok(sections) => (
+                StatusCode::OK,
+                Json(
+                    sections
+                        .iter()
+                        .map(|s| SectionDto {
+                            id: s.id,
+                            name: s.name.clone(),
+                            created_at: s.created_at,
+                            updated_at: s.updated_at,
+                        })
+                        .collect::<Vec<SectionDto>>(),
+                ),
+            )
+                .into_response(),
+            Err(e) => e.into_response(),
+        }
+    }
+
     pub async fn get_sections_handler(state: State<AppState>) -> impl IntoResponse {
         match SectionService::get_sections(&state.db).await {
             Ok(sections) => (
