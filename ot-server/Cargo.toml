@@ -1,7 +1,8 @@
 [package]
 name = "ot-server"
 version = "0.1.0"
-edition = "2021"
+edition = "2024"
+rust-version = "1.85"
 
 [lib]
 name = "ot_server"
@@ -15,7 +16,6 @@ sea-orm-migration = "1.1.4"
 chrono = { version = "0.4", features = ["serde"] }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1"
-# thiserror = "2"
 tokio = { version = "1.43.0", features = ["full"] }
 validator = { version = "0.20.0", features = ["derive"] }
 tracing = "0.1.41"
@@ -28,6 +28,3 @@ thiserror = "2.0.11"
 async-trait = "0.1.86"
 axum-valid = "0.22.0"
 time = "0.3.37"
-# tracing = "0.1"
-# tracing-subscriber = { version = "0.3", features = ["env-filter"] }
-# validator = { version = "0.20.0"}
