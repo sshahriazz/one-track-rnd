@@ -88,9 +88,11 @@ function ControlButton({
           onPress={async () => {
             if (!isRunning) {
               await invoke("control_timer", { command: "Start" });
+              console.log("Timer started");
               setIsRunning(true);
             } else {
               await invoke("control_timer", { command: "Stop" });
+              console.log("Timer stopped");
               setIsRunning(false);
             }
           }}

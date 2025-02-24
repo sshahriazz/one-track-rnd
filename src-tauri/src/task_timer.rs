@@ -5,7 +5,10 @@ use serde::{Deserialize, Serialize};
 use tauri::{Emitter, Manager, State};
 use tokio::time::{Duration, Instant};
 
-use crate::{AppState, track_activity::ScreenShotActivity};
+use crate::{
+    AppState,
+    track_activity::{ScreenShotCommand, screenshot_command},
+};
 
 /// Commands that can be sent to control the timer
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -41,30 +44,40 @@ pub async fn control_timer(
     let mut app_state = state
         .lock()
         .map_err(|e| TimerError::LockError(format!("{:?}", e)))?;
-    let ss_activity = ScreenShotActivity::new(20.0, true);
     match command {
         TimerCommand::Start => {
             let should_start =
                 !app_state.timer_state.running && app_state.timer_state.elapsed.as_secs() == 0;
 
             if should_start {
-                // Update timer state
+                // Reset and update timer state
                 app_state.timer_state.running = true;
                 app_state.timer_state.start_instant = Some(Instant::now());
                 app_state.timer_state.start_date_time = Some(Utc::now());
                 app_state.timer_state.end_date_time = None;
                 app_state.timer_state.elapsed = Duration::from_secs(0);
+                
+                // Always enable screenshots when starting fresh
+                app_state.app_config.enable_screen_shots = true;
+                let enable_screen_shots = app_state.app_config.enable_screen_shots;
+                let idle_time_threshold = app_state.app_config.screen_shots_interval;
+                
+                println!(
+                    "[Timer] Starting timer. Screen shots: {:?}, Idle threshold: {:?}",
+                    enable_screen_shots, idle_time_threshold
+                );
+                
+                tokio::spawn(async move {
+                    screenshot_command(
+                        ScreenShotCommand::Running,
+                        Some(idle_time_threshold),
+                        Some(enable_screen_shots),
+                    )
+                    .await;
+                });
             }
 
             // Drop the lock before async operation
-            drop(app_state);
-
-            // Start screenshot capture if needed
-            if should_start {
-                tokio::spawn(async move {
-                    ss_activity.start_capturing().await;
-                });
-            }
         }
         TimerCommand::Pause => {
             // Pause should only work if timer is running
@@ -74,11 +87,11 @@ pub async fn control_timer(
                 }
                 app_state.timer_state.running = false;
                 app_state.timer_state.start_instant = None;
+                app_state.app_config.enable_screen_shots = false;
+                tokio::spawn(async move {
+                    screenshot_command(ScreenShotCommand::Stopped, None, None).await;
+                });
             }
-            drop(app_state);
-            tokio::spawn(async move {
-                ss_activity.stop_capturing().await;
-            });
         }
         TimerCommand::Resume => {
             // Resume should only work if timer is not running and has elapsed time
@@ -87,14 +100,16 @@ pub async fn control_timer(
             if should_resume {
                 app_state.timer_state.running = true;
                 app_state.timer_state.start_instant = Some(Instant::now());
-            }
-            // Drop the lock before async operation
-            drop(app_state);
-
-            // Start screenshot capture if needed
-            if should_resume {
+                app_state.app_config.enable_screen_shots = true;
+                let enable_screen_shots = app_state.app_config.enable_screen_shots;
+                let idle_time_threshold = app_state.app_config.screen_shots_interval;
                 tokio::spawn(async move {
-                    ss_activity.start_capturing().await;
+                    screenshot_command(
+                        ScreenShotCommand::Running,
+                        Some(idle_time_threshold),
+                        Some(enable_screen_shots),
+                    )
+                    .await;
                 });
             }
         }
@@ -104,6 +119,9 @@ pub async fn control_timer(
                 if let Some(start) = app_state.timer_state.start_instant {
                     app_state.timer_state.elapsed += start.elapsed();
                 }
+                tokio::spawn(async move {
+                    screenshot_command(ScreenShotCommand::Stopped, None, None).await;
+                });
             }
             // Record end time before resetting
             app_state.timer_state.end_date_time = Some(Utc::now());
@@ -112,6 +130,7 @@ pub async fn control_timer(
             app_state.timer_state.running = false;
             app_state.timer_state.start_instant = None;
             app_state.timer_state.elapsed = Duration::from_secs(0);
+            app_state.app_config.enable_screen_shots = false;
 
             // Emit one final update after stopping
             let timer_response = TimerResponse {
@@ -123,10 +142,6 @@ pub async fn control_timer(
             if let Err(e) = app_handle.emit("timer-update", timer_response) {
                 eprintln!("Failed to emit final timer update: {:?}", e);
             }
-            drop(app_state);
-            tokio::spawn(async move {
-                ss_activity.stop_capturing().await;
-            });
         }
         TimerCommand::AddTime(seconds) => {
             // Add time should only work when timer is paused (not running but has elapsed time)

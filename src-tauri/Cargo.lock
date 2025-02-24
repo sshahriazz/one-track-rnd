@@ -3578,6 +3578,7 @@ dependencies = [
  "chrono",
  "device_query",
  "image 0.24.9",
+ "lazy_static",
  "once_cell",
  "ot-server",
  "rand 0.8.5",
