@@ -1,5 +1,7 @@
 import { Button, cn } from "@heroui/react";
+import { invoke } from "@tauri-apps/api/core";
 import { motion } from "framer-motion";
+import { useState } from "react";
 
 interface ControlButtonProps {
   disableBg?: boolean;
@@ -10,6 +12,7 @@ function ControlButton({
   disableBg = false,
   enableAnimation = true,
 }: ControlButtonProps) {
+  const [isRunning, setIsRunning] = useState(false);
   return (
     <div className="relative">
       <motion.div
@@ -82,13 +85,22 @@ function ControlButton({
       />
       <div className="relative size-28 flex items-center justify-center">
         <Button
+          onPress={async () => {
+            if (!isRunning) {
+              await invoke("control_timer", { command: "Start" });
+              setIsRunning(true);
+            } else {
+              await invoke("control_timer", { command: "Stop" });
+              setIsRunning(false);
+            }
+          }}
           variant="shadow"
           color="success"
           className={cn(
             "size-20 text-success-600 border-2 border-success-600 font-semibold bg-white rounded-[100%] flex items-center justify-center"
           )}
         >
-          Stop
+          {isRunning ? "Stop" : "Start"}
         </Button>
       </div>
     </div>

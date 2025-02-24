@@ -6,6 +6,7 @@ mod cmd;
 mod services;
 mod state;
 mod task_timer;
+mod track_activity;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub async fn run() {

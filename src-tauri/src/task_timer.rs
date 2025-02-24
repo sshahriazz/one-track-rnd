@@ -1,11 +1,11 @@
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex, atomic::AtomicBool};
 
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use tauri::{Emitter, Manager, State};
 use tokio::time::{Duration, Instant};
 
-use crate::AppState;
+use crate::{AppState, track_activity::ScreenShotActivity};
 
 /// Commands that can be sent to control the timer
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -41,16 +41,29 @@ pub async fn control_timer(
     let mut app_state = state
         .lock()
         .map_err(|e| TimerError::LockError(format!("{:?}", e)))?;
-
+    let ss_activity = ScreenShotActivity::new(20.0, true);
     match command {
         TimerCommand::Start => {
-            // Start should only work if timer is not running and has no elapsed time
-            if !app_state.timer_state.running && app_state.timer_state.elapsed.as_secs() == 0 {
+            let should_start =
+                !app_state.timer_state.running && app_state.timer_state.elapsed.as_secs() == 0;
+
+            if should_start {
+                // Update timer state
                 app_state.timer_state.running = true;
                 app_state.timer_state.start_instant = Some(Instant::now());
                 app_state.timer_state.start_date_time = Some(Utc::now());
                 app_state.timer_state.end_date_time = None;
                 app_state.timer_state.elapsed = Duration::from_secs(0);
+            }
+
+            // Drop the lock before async operation
+            drop(app_state);
+
+            // Start screenshot capture if needed
+            if should_start {
+                tokio::spawn(async move {
+                    ss_activity.start_capturing().await;
+                });
             }
         }
         TimerCommand::Pause => {
@@ -62,12 +75,27 @@ pub async fn control_timer(
                 app_state.timer_state.running = false;
                 app_state.timer_state.start_instant = None;
             }
+            drop(app_state);
+            tokio::spawn(async move {
+                ss_activity.stop_capturing().await;
+            });
         }
         TimerCommand::Resume => {
             // Resume should only work if timer is not running and has elapsed time
-            if !app_state.timer_state.running && app_state.timer_state.elapsed.as_secs() > 0 {
+            let should_resume =
+                !app_state.timer_state.running && app_state.timer_state.elapsed.as_secs() > 0;
+            if should_resume {
                 app_state.timer_state.running = true;
                 app_state.timer_state.start_instant = Some(Instant::now());
+            }
+            // Drop the lock before async operation
+            drop(app_state);
+
+            // Start screenshot capture if needed
+            if should_resume {
+                tokio::spawn(async move {
+                    ss_activity.start_capturing().await;
+                });
             }
         }
         TimerCommand::Stop => {
@@ -95,6 +123,10 @@ pub async fn control_timer(
             if let Err(e) = app_handle.emit("timer-update", timer_response) {
                 eprintln!("Failed to emit final timer update: {:?}", e);
             }
+            drop(app_state);
+            tokio::spawn(async move {
+                ss_activity.stop_capturing().await;
+            });
         }
         TimerCommand::AddTime(seconds) => {
             // Add time should only work when timer is paused (not running but has elapsed time)
